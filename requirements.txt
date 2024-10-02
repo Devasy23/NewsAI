@@ -109,7 +109,7 @@ rich==13.8.0
 rpds-py==0.20.0
 rsa==4.9
 safetensors==0.4.4
-scikit-learn==1.5.1
+scikit-learn==1.5.2
 scipy==1.14.1
 seaborn==0.13.2
 sentence-transformers==3.0.1
