@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import aiohttp
 import requests
 from bs4 import BeautifulSoup
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryCallState, retry_if_exception_type
 
 from src.utils.dbconnector import (append_to_document, content_manager,
                                    find_documents)
@@ -111,6 +112,75 @@ async def fetch_article_content(article_ids, session):
     logger.info(f"Total articles content fetched: {len(article_contents)}")
     return article_contents
 
+def fetch_content_before_sleep(retry_state: RetryCallState):
+    wait_time = retry_state.next_action.sleep
+    attempt_number = retry_state.attempt_number
+    print(f"Retrying after {wait_time:.2f} seconds (Attempt {attempt_number})...")
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type((aiohttp.ClientError, asyncio.TimeoutError)),
+    before_sleep=fetch_content_before_sleep,
+)
+async def fetch_article_content_from_url(url: str, session: aiohttp.ClientSession) -> str:
+    """
+    Fetches the content of an article from a given URL.
+
+    Args:
+        url (str): The URL of the article to fetch content from.
+        session (aiohttp.ClientSession): The aiohttp session to use for the request.
+
+    Returns:
+        str: Content of the fetched article.
+    """
+    async def sanitize_content(content):
+        """ Removes any unwanted characters from the content.""" 
+        content = content.replace("\n", " ")
+        content = content.replace("\t", " ")
+        content = content.strip()
+        return content
+
+    async def parse_html(html):
+        """ Parses the HTML content and extracts the article content."""
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+            # Extract the article content from all the <p> tags
+            page = soup.find_all("p")
+            content = [await sanitize_content(x.get_text()) for x in page]
+            content = " ".join(content)
+            return content
+        except Exception as e:
+            logger.error(f"Error parsing HTML: {e}")
+            raise
+
+    try:
+        async with session.get(url) as response:
+            if response.status == 200:
+                response_text = await response.text()
+                content = await parse_html(response_text)
+                return content
+            else:
+                raise Exception(
+                    f"Failed to fetch article {url}: {response.status}"
+                )
+    except Exception as e:
+        logger.error(f"Error fetching content for article {url}: {e}")
+        raise
+
+async def test_fetch_article_content_from_url(urls: List[str]) -> List[List[str]]:
+    """
+    Tests the fetch_article_content_from_url function by fetching content for a list of article URLs.
+
+    Args:
+        urls (List[str]): A list of article URLs to fetch content for.
+
+    Returns:
+        List[List[str]]: A list of lists where each list contains the content of a fetched article.
+    """
+    async with aiohttp.ClientSession() as session:
+        contents = await asyncio.gather(*[fetch_article_content_from_url(url, session) for url in urls])
+        logger.info(contents)  # Print the fetched content for verification
 
 async def test_fetch_article_content(article_ids: List[str]) -> List[Dict[str, str]]:
     """
@@ -128,9 +198,16 @@ async def test_fetch_article_content(article_ids: List[str]) -> List[Dict[str, s
 
 
 if __name__ == "__main__":
-    url = "https://www.rt.com/india/602908-reclaiming-night-protests-over-rape/"
-    article_ids = [
-        "b01d85d7-d538-47cc-a7c4-31c13e7f6b4e",
-        "15133cc7-1522-41f9-8db4-70568e837968",
+    # url = "https://www.rt.com/india/602908-reclaiming-night-protests-over-rape/"
+    # article_ids = [
+    #     "b01d85d7-d538-47cc-a7c4-31c13e7f6b4e",
+    #     "15133cc7-1522-41f9-8db4-70568e837968",
+    # ]
+    # asyncio.run(test_fetch_article_content())
+    urls = [
+        "https://www.rt.com/india/602908-reclaiming-night-protests-over-rape/",
+        "https://edition.cnn.com/2024/10/03/politics/abortion-melania-trump/index.html",
+        "https://www.androidauthority.com/full-res-pixel-9a-wallpapers-3487229/",
+        "https://edition.cnn.com/world/live-news/israel-iran-attack-war-lebanon-10-03-24-intl-hnk/index.html",
     ]
-    asyncio.run(test_fetch_article_content())
+    asyncio.run(test_fetch_article_content_from_url(urls))
