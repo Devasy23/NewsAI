@@ -217,3 +217,34 @@ def fetch_and_combine_articles(collection_name, article_ids):
     except Exception as e:
         logger.error(f"Failed to fetch and combine articles: {e}")
         raise
+
+def fetch_and_combine_reddit_posts_and_comments(post_ids):
+    """
+    Fetches Reddit posts and their comments from the MongoDB database using the given post IDs and combines them into a Pandas DataFrame.
+
+    Args:
+        post_ids (List[str]): List of post IDs to fetch and combine.
+
+    Returns:
+        pd.DataFrame: A Pandas DataFrame containing the combined posts and comments.
+
+    Raises:
+        Exception: If there is an error fetching and combining the documents.
+    """
+    db = get_mongo_client()
+    posts_collection = db["reddit_posts"]
+
+    try:
+        # Fetch posts by their IDs
+        query = {"id": {"$in": post_ids}}
+        posts_cursor = posts_collection.find(query)
+        
+        posts = []
+        for post in posts_cursor:
+            post["_id"] = str(post["_id"])
+            posts.append(post)
+        return posts
+
+    except Exception as e:
+        logger.error(f"Failed to fetch and combine Reddit posts and comments: {e}")
+        raise
