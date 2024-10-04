@@ -12,6 +12,8 @@ from src.preprocessing.keyword_extraction import (bert_keyword_extraction,
 from src.preprocessing.summarization import summarize_texts
 from src.sentiment_analysis.classify import (analyze_sentiments,
                                              classify_sentiments)
+# function for reddit post fetching and sentiment analysis
+from src.sentiment_analysis.reddit_analysis import fetch_required_reddit_posts
 from src.sentiment_analysis.wordcloud import generate_wordcloud
 from src.utils.dbconnector import append_to_document, content_manager
 from src.utils.logger import setup_logger
