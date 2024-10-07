@@ -131,7 +131,7 @@ sphinxcontrib-serializinghtml==2.0.0
 streamlit==1.38.0
 streamlit-echarts==0.4.0
 sympy==1.13.2
-tenacity==8.5.0
+tenacity==9.0.0
 threadpoolctl==3.5.0
 tokenizers==0.19.1
 toml==0.10.2
